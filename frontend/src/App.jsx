@@ -32,7 +32,7 @@ const App = () => {
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100">
       <Header currentView={currentView} onNavigate={setCurrentView} />
-      <main className="container mx-auto px-4 py-8 max-w-6xl">
+      <main className="container mx-auto px-auto py-8 max-w-6xl">
         {renderCurrentView()}
       </main>
     </div>
@@ -50,7 +50,7 @@ const Header = ({ currentView, onNavigate }) => {
   ];
 
   return (
-    <header className="bg-gray-800 border-b border-gray-700">
+    <header className="bg-gray-800 border-b border-gray-700 shadow-md">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center space-x-2">
@@ -62,11 +62,10 @@ const Header = ({ currentView, onNavigate }) => {
               <button
                 key={id}
                 onClick={() => onNavigate(id)}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  currentView === id
+                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${currentView === id
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                }`}
+                  }`}
               >
                 <Icon className="w-4 h-4" />
                 <span className="hidden sm:inline">{label}</span>
@@ -96,7 +95,7 @@ const HomePage = ({ onNavigate }) => {
       description: 'Search for legal precedents and case laws from Supreme Court and High Courts',
       icon: Search,
       color: 'bg-green-500',
-      stats: '50,000+ Cases'
+      stats: '100+ Cases'
     },
     {
       id: 'document',
@@ -104,13 +103,13 @@ const HomePage = ({ onNavigate }) => {
       description: 'Generate legal documents, contracts, and agreements with AI assistance',
       icon: FileText,
       color: 'bg-purple-500',
-      stats: '100+ Templates'
+      stats: '5+ Templates'
     },
   ];
 
   const stats = [
     { icon: BookOpen, label: 'Legal Sections', value: '2000+' },
-    { icon: Gavel, label: 'Case Laws', value: '50,000+' },
+    { icon: Gavel, label: 'Case Laws', value: '200+' },
     { icon: Users, label: 'Legal Professionals', value: '1000+' },
     { icon: Award, label: 'Success Rate', value: '98%' },
   ];
@@ -122,11 +121,11 @@ const HomePage = ({ onNavigate }) => {
           Welcome to <span className="text-blue-400">LegalBot</span>
         </h1>
         <p className="text-xl text-gray-300 max-w-3xl mx-auto mb-8">
-          Your comprehensive AI-powered legal assistant for Indian law research, case analysis, and document creation. 
+          Your comprehensive AI-powered legal assistant for Indian law research, case analysis, and document creation.
           Streamline your legal research with cutting-edge artificial intelligence.
         </p>
         <div className="flex justify-center space-x-4">
-          <button 
+          <button
             onClick={() => onNavigate('ipc')}
             className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-medium transition-colors"
           >
@@ -249,7 +248,7 @@ const ChatInterface = ({ title, onSubmit, loading, children }) => {
         </h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 ">
         {children}
         <div ref={messagesEndRef} />
       </div>
@@ -312,7 +311,7 @@ const BotMessage = ({ message, citations, documents }) => {
   const formatLegalText = (text) => {
     // Split text into sections and format case citations
     const sections = text.split(/\*\*/).filter(section => section.trim());
-    
+
     return sections.map((section, index) => {
       if (section.includes('State of') || section.includes('v.') || section.includes('SCC') || section.includes('AIR')) {
         return (
@@ -378,7 +377,7 @@ const BotMessage = ({ message, citations, documents }) => {
             </button>
           </div>
         </div>
-        
+
         {citations && citations.length > 0 && (
           <div className="mt-3 p-3 bg-gray-800 rounded-lg border border-gray-600">
             <h4 className="text-sm font-semibold text-blue-300 mb-2 flex items-center">
@@ -410,7 +409,7 @@ const BotMessage = ({ message, citations, documents }) => {
                       Relevance: {doc.score ? (doc.score * 100).toFixed(1) : 'N/A'}%
                     </span>
                     <div className="w-12 bg-gray-700 rounded-full h-1">
-                      <div 
+                      <div
                         className="bg-blue-400 h-1 rounded-full"
                         style={{ width: `${doc.score ? doc.score * 100 : 0}%` }}
                       ></div>
@@ -440,7 +439,7 @@ const IPCFinder = ({ onAddMessage }) => {
       /IPC\s+\d+/gi,
       /Chapter\s+[IVX]+/gi,
     ];
-    
+
     const citations = [];
     patterns.forEach(pattern => {
       const matches = text.match(pattern);
@@ -448,7 +447,7 @@ const IPCFinder = ({ onAddMessage }) => {
         citations.push(...matches.map(match => match.trim()));
       }
     });
-    
+
     return [...new Set(citations)];
   };
 
@@ -464,25 +463,25 @@ const IPCFinder = ({ onAddMessage }) => {
       });
 
       const data = await response.json();
-      
+
       if (data.answer) {
         const citations = extractCitations(data.answer);
-        setMessages(prev => [...prev, { 
-          type: 'bot', 
+        setMessages(prev => [...prev, {
+          type: 'bot',
           content: data.answer,
           citations: citations,
           documents: data.retrieved_docs || []
         }]);
         onAddMessage(query, data.answer, 'IPC');
       } else {
-        setMessages(prev => [...prev, { 
-          type: 'bot', 
+        setMessages(prev => [...prev, {
+          type: 'bot',
           content: 'I apologize, but I couldn\'t find relevant IPC sections for your query. Please try rephrasing your question.'
         }]);
       }
     } catch (error) {
-      setMessages(prev => [...prev, { 
-        type: 'bot', 
+      setMessages(prev => [...prev, {
+        type: 'bot',
         content: 'Sorry, there was an error processing your request. Please try again.'
       }]);
     } finally {
@@ -497,8 +496,8 @@ const IPCFinder = ({ onAddMessage }) => {
           {message.type === 'user' ? (
             <UserMessage message={message.content} />
           ) : (
-            <BotMessage 
-              message={message.content} 
+            <BotMessage
+              message={message.content}
               citations={message.citations}
               documents={message.documents}
             />
@@ -529,7 +528,7 @@ const PrecedenceFinder = ({ onAddMessage }) => {
       /\d{4}\s+SCC\s+\([^)]+\)\s+\d+/gi,
       /\d{4}\s+\(\d+\)\s+SCC\s+\d+/gi,
     ];
-    
+
     const citations = [];
     patterns.forEach(pattern => {
       const matches = text.match(pattern);
@@ -537,7 +536,7 @@ const PrecedenceFinder = ({ onAddMessage }) => {
         citations.push(...matches.map(match => match.trim()));
       }
     });
-    
+
     return [...new Set(citations)];
   };
 
@@ -546,33 +545,45 @@ const PrecedenceFinder = ({ onAddMessage }) => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8080/query/legal', {
+      const res = await fetch('http://localhost:8080/query/legal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query })
       });
+      const data = await res.json();
 
-      const data = await response.json();
-      
-      if (data.answer) {
-        const citations = extractCitations(data.answer);
-        setMessages(prev => [...prev, { 
-          type: 'bot', 
-          content: data.answer,
-          citations: citations,
+      /*  NEW: handle multi-model answers  */
+      if (data.answers) {
+        // 1.  Build five separate bot-message objects
+        const botMessages = Object.entries(data.answers).map(([model, text]) => ({
+          type: 'bot',
+          content: `[${model}]\n\n${text}`,
+          citations: extractCitations(text),
           documents: data.retrieved_docs || []
-        }]);
-        onAddMessage(query, data.answer, 'Precedence');
+        }));
+
+        // 2.  Append all five at once (keeps chat order clean)
+        setMessages(prev => [...prev, ...botMessages]);
+
+        // 3.  Store only the first model in history (keeps history concise)
+        const firstModel = Object.keys(data.answers)[0];
+        onAddMessage(query, data.answers[firstModel], 'Precedence');
       } else {
-        setMessages(prev => [...prev, { 
-          type: 'bot', 
-          content: 'I couldn\'t find relevant precedents for your query. Please try rephrasing your question.'
+        // fallback – should never fire
+        setMessages(prev => [...prev, {
+          type: 'bot',
+          content: 'No answer received from backend.',
+          citations: [],
+          documents: []
         }]);
       }
     } catch (error) {
-      setMessages(prev => [...prev, { 
-        type: 'bot', 
-        content: 'Sorry, there was an error processing your request. Please try again.'
+      console.error(error);
+      setMessages(prev => [...prev, {
+        type: 'bot',
+        content: 'Sorry, there was an error contacting the server.',
+        citations: [],
+        documents: []
       }]);
     } finally {
       setLoading(false);
@@ -586,8 +597,8 @@ const PrecedenceFinder = ({ onAddMessage }) => {
           {message.type === 'user' ? (
             <UserMessage message={message.content} />
           ) : (
-            <BotMessage 
-              message={message.content} 
+            <BotMessage
+              message={message.content}
               citations={message.citations}
               documents={message.documents}
             />
@@ -623,22 +634,22 @@ const DocumentCreator = ({ onAddMessage }) => {
       });
 
       const data = await response.json();
-      
+
       if (data.contract) {
-        setMessages(prev => [...prev, { 
-          type: 'bot', 
+        setMessages(prev => [...prev, {
+          type: 'bot',
           content: data.contract
         }]);
         onAddMessage(query, data.contract, 'Document');
       } else {
-        setMessages(prev => [...prev, { 
-          type: 'bot', 
+        setMessages(prev => [...prev, {
+          type: 'bot',
           content: 'I couldn\'t generate a document for your request. Please provide more specific details.'
         }]);
       }
     } catch (error) {
-      setMessages(prev => [...prev, { 
-        type: 'bot', 
+      setMessages(prev => [...prev, {
+        type: 'bot',
         content: 'Sorry, there was an error generating the document. Please try again.'
       }]);
     } finally {

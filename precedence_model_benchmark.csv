@@ -1,0 +1,6 @@
+query,model,precision@3,recall@3,mrr,ndcg@3,bleu,bert_f1
+Leading case on right to privacy?,Llama-3.2-1B,0.3333333333333333,1.0,1.0,1.0,0,0.8070530295372009
+Leading case on right to privacy?,Phi-2.7B,0.3333333333333333,1.0,1.0,1.0,0,0.810791552066803
+Leading case on right to privacy?,Gemma-3-1B,0.3333333333333333,1.0,1.0,1.0,0,0.78336501121521
+Leading case on right to privacy?,Qwen3-1.7B,0.3333333333333333,1.0,1.0,1.0,0,0.8058182597160339
+Leading case on right to privacy?,Mistral-7B,0.3333333333333333,1.0,1.0,1.0,0,0.8063333034515381

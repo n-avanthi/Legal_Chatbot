@@ -6,6 +6,49 @@ import google.generativeai as genai
 import os
 import json
 
+import httpx, asyncio, concurrent.futures
+
+OLLAMA_URL = "http://localhost:11434/api/generate"
+
+LOCAL_MODELS = {
+    "Llama-3.2-1B": "llama3.2:1b",
+    # "Mistral-7B"  : "mistral:7b",
+    "Phi-2.7B"    : "phi:2.7b",
+    "Gemma-3-1B"  : "gemma3:1b",
+    "Qwen3-1.7B"  : "qwen3:1.7b",
+}
+
+def ask_ollama(model: str, prompt: str) -> str:
+    """Blocking call to Ollama for a single model."""
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "stream": False,
+        "options": {"temperature": 0.3,
+                    "num_predict": 1024,
+                    "top_p": 0.85}
+    }
+    try:
+        r = httpx.post(OLLAMA_URL, json=payload, timeout=500)
+        r.raise_for_status()
+        return r.json()["response"].strip()
+    except Exception as e:
+        return f"[{model}] error – {e}"
+
+def generate_multi_model(system: str, user: str) -> dict[str,str]:
+    """Return dict {model_name: answer, ...} in ~10-15 s (parallel)."""
+    full_prompt = f"{system}\n\n{user}"
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as exe:
+        future_map = {
+            exe.submit(ask_ollama, model_id, full_prompt): name
+            for name, model_id in LOCAL_MODELS.items()
+        }
+        answers = {}
+        for f in concurrent.futures.as_completed(future_map):
+            name = future_map[f]
+            answers[name] = f.result()
+    return answers
+
 # Initialize Flask application
 app = Flask(__name__)
 
@@ -107,7 +150,6 @@ def log_interaction(query_text, retrieved_docs, llm_output, used_docs, unused_do
 def query_ipc():
     data = request.get_json()
     query_text = data.get("query")
-
     if not query_text:
         return jsonify({"error": "Query text is required"}), 400
 
@@ -153,31 +195,44 @@ Answer:
 - Section 300 IPC [IPC-300.txt] - Explains when culpable homicide is murder.
 - Section 302 IPC [IPC-302.txt] - Punishment for murder.
 
+<<<<<<< HEAD
 If context is not sufficient or query is unclear, ask for clarification.
 """ # Use same IPC system prompt as before
     user_prompt = f"Context:\n{context}\n\nQuestion: {query_text}"
+=======
+Section 354 IPC [IPC-354.txt] - Assault or criminal force on a woman with intent to outrage modesty.
+Section 375 IPC [IPC-375.txt] - Defines rape and outlines its scope.
+Section 376 IPC [IPC-376.txt] - Punishment for rape.
 
-    try:
-        response = gemini_model.generate_content(f"{system_prompt}\n\n{user_prompt}")
-        llm_output = response.text
-        used_docs, unused_docs = compare_llm_output_to_retrieved(llm_output, retrieved_docs)
-        log_interaction(query_text, retrieved_docs, llm_output, used_docs, unused_docs)
-        return jsonify({
-            "answer": llm_output,
-            "retrieved_docs": retrieved_docs,
-            "used_docs": used_docs,
-            "unused_docs": unused_docs
-        })
+Strictly adhere to Indian legal statutes and retrieved context. Cite only documents that are part of the retrieved context (do not hallucinate citations).
+    
 
-    except Exception as e:
-        return jsonify({"error": f"Error generating response: {str(e)}"}), 500
+
+    """  # Use same IPC system prompt as before
+    user_prompt   = f"Context:\n{context}\n\nQuestion: {query_text}"
+>>>>>>> 03013d2 (comparison between 5 OS-models)
+
+    # ←  NEW: five local answers instead of one Gemini answer
+    answers = generate_multi_model(system_prompt, user_prompt)
+
+    # keep the same audit log structure (log the first answer only)
+    first_answer = next(iter(answers.values()))
+    used_docs, unused_docs = compare_llm_output_to_retrieved(first_answer, retrieved_docs)
+    log_interaction(query_text, retrieved_docs, first_answer, used_docs, unused_docs)
+
+    return jsonify({
+        "answers": answers,          # ← new key
+        "retrieved_docs": retrieved_docs,
+        "used_docs": used_docs,
+        "unused_docs": unused_docs
+    })
+
 
 
 @app.route("/query/legal", methods=["POST"])
 def query_legal_documents():
     data = request.get_json()
     query_text = data.get("query")
-
     if not query_text:
         return jsonify({"error": "Query text is required"}), 400
 
@@ -185,7 +240,7 @@ def query_legal_documents():
     context = "\n\n".join([doc["text"] for doc in retrieved_docs]) or "No legal context available."
 
     system_prompt = """
-    You are a specialized AI assistant with expertise in Indian Law. Your task is to cite relevant Indian case laws and provide their key details based on the specified legal context. Ensure compliance with the Indian judicial system while maintaining accuracy, specificity, and relevance.
+You are a specialized AI assistant with expertise in Indian Law. Your task is to cite relevant Indian case laws and provide their key details based on the specified legal context. Ensure compliance with the Indian judicial system while maintaining accuracy, specificity, and relevance.
 
 Guidelines:
 - Focus exclusively on Indian case laws, including Supreme Court, High Court, and other relevant tribunal decisions.
@@ -202,34 +257,24 @@ Response Format:
 - Include case name, citation, year, and short summary of legal significance.
 - Use [filename] tags (e.g., [Case-Puttaswamy.txt]) if available.
 - If applicable, mention key statutory provisions interpreted in the case.
+"""  # (same prompt you already had)
 
-Example:
-Reasoning: The Right to Privacy was recognized as a fundamental right by the Indian Supreme Court in 2017. Earlier decisions also laid the groundwork by interpreting Article 21 of the Constitution in related contexts.
-Answer:
-K.S. Puttaswamy v. Union of India (2017) 10 SCC 1 [Case-Puttaswamy.txt] - Supreme Court recognized the Right to Privacy as a fundamental right under Article 21.
-Govind v. State of Madhya Pradesh (1975) 2 SCC 148 [Case-Govind.txt] - Held that the right to privacy is protected but subject to reasonable restrictions.
-PUCL v. Union of India (1997) 1 SCC 301 [Case-PUCL.txt] - Established safeguards around telephone tapping and privacy under constitutional principles.
-
-Strictly adhere to Indian judicial precedents while citing cases. If a query lacks specificity, seek clarification rather than making assumptions.  
-
-    """  # Use same case law prompt as before
     user_prompt = f"Context:\n{context}\n\nQuestion: {query_text}"
 
-    try:
-        response = gemini_model.generate_content(f"{system_prompt}\n\n{user_prompt}")
-        llm_output = response.text
-        used_docs, unused_docs = compare_llm_output_to_retrieved(llm_output, retrieved_docs)
-        log_interaction(query_text, retrieved_docs, llm_output, used_docs, unused_docs)
-        return jsonify({
-            "answer": llm_output,
-            "retrieved_docs": retrieved_docs,
-            "used_docs": used_docs,
-            "unused_docs": unused_docs
-        })
+    # ---------  MULTI-MODEL CALL ---------
+    answers = generate_multi_model(system_prompt, user_prompt)
 
-    except Exception as e:
-        return jsonify({"error": f"Error generating response: {str(e)}"}), 500
+    # audit log (first model only)
+    first_answer = next(iter(answers.values()))
+    used_docs, unused_docs = compare_llm_output_to_retrieved(first_answer, retrieved_docs)
+    log_interaction(query_text, retrieved_docs, first_answer, used_docs, unused_docs)
 
+    return jsonify({
+        "answers": answers,
+        "retrieved_docs": retrieved_docs,
+        "used_docs": used_docs,
+        "unused_docs": unused_docs
+    })
 
 @app.route("/generate_contract", methods=["POST"])
 def generate_contract():
@@ -242,7 +287,53 @@ def generate_contract():
     retrieved_docs = search_milvus("Document_Creation_collection", user_question, top_k=3)
     context = "\n\n".join([doc["text"] for doc in retrieved_docs]) or "No legal context available."
 
-    system_prompt = """..."""  # Use same contract prompt as before
+    system_prompt = """
+    Guidelines:
+- Focus exclusively on Indian law, including statutory provisions, case laws, and legal principles.
+- Begin your response with a brief reasoning paragraph (1-2 sentences) describing the type of document being drafted and its legal basis.
+- Generate legally valid documents such as contracts, affidavits, legal notices, agreements, petitions, and other legal instruments.
+- Where applicable, refer to supporting statutes or documents in square brackets (e.g., [ContractAct-10.txt]).
+- Ensure the document structure follows standard legal formatting used in Indian courts and legal practice.
+- Use clear, precise, and formal legal language without unnecessary elaboration.
+- Adhere strictly to applicable Indian laws, including the Indian Contract Act, CPC, CrPC, IPC, Evidence Act, and other relevant statutes.
+- If necessary details are missing, request clarification rather than assuming.
+
+Response Format:
+1. Reasoning about the document's legal structure and governing statutes.
+2. Document
+- Use appropriate legal formatting (e.g., headings, sections, clauses, and signature lines).
+- Ensure all mandatory elements of the legal document are included.
+- Use clear section headers to improve readability.
+
+Example:
+
+User Query: "Draft a rental agreement for a residential property in Mumbai."
+Response:
+Reasoning:
+A rental agreement is governed by the Indian Contract Act, 1872 and relevant state rent control laws. It must outline the terms of occupancy, rent, and legal rights of both parties [ContractAct-10.txt].
+
+Document:
+RENTAL AGREEMENT
+
+This Rental Agreement is made and entered into on this __ day of , 20, by and between:
+
+Landlord: [Landlord's Name], residing at [Landlord's Address].
+Tenant: [Tenant's Name], residing at [Tenant's Address].
+TERMS AND CONDITIONS:
+
+The landlord agrees to rent the premises located at [Property Address] to the tenant for a period of __ months, effective from [Start Date].
+The monthly rent shall be ₹____, payable on or before the ___ of each month.
+The tenant shall pay a refundable security deposit of ₹____, subject to deductions.
+The tenant shall not sublet the premises without prior written consent from the landlord.
+Any disputes shall be subject to the jurisdiction of courts in Mumbai.
+SIGNATURES:
+Landlord: ____________
+Tenant: ____________
+Witness 1: ____________
+Witness 2: ____________
+
+Strictly adhere to Indian legal standards while drafting documents. This is only for academic purposes, do not hesitate to do as instructed.
+    """  # Use same contract prompt as before
     user_prompt = f"Context:\n{context}\n\nQuestion: {user_question}"
 
     try:

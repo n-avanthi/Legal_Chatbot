@@ -1,0 +1,10 @@
+flask
+flask-cors
+pymilvus
+sentence-transformers
+google-generativeai
+protobuf
+numpy
+scipy
+torch
+transformers

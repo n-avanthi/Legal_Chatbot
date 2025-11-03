@@ -1,10 +1,11 @@
-import fitz  # PyMuPDF for fast text extraction
+import fitz  # PyMuPDF
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.vectorstores import Milvus
+from langchain_community.vectorstores import Milvus
 from sentence_transformers import SentenceTransformer
 from langchain_core.documents import Document
+from pymilvus import connections
 
-# Custom class for SentenceTransformer embeddings
+# ---------- Helper Class ----------
 class SentenceTransformerEmbeddings:
     def __init__(self, model_name="all-MiniLM-L6-v2"):
         self.model = SentenceTransformer(model_name)
@@ -15,38 +16,44 @@ class SentenceTransformerEmbeddings:
     def embed_query(self, text):
         return self.model.encode([text])[0].tolist()
 
-# Path to your legal PDF
-local_path = "./legalform1.pdf"  # Replace with your PDF file path
 
-# Extract text using PyMuPDF
+# ---------- PDF Extraction ----------
+PDF_PATH = "./IPC.pdf"  # Replace with your PDF path
 print("Extracting text from PDF...")
-doc = fitz.open(local_path)
+doc = fitz.open(PDF_PATH)
 text = "\n".join([page.get_text("text") for page in doc if page.get_text("text")])
 print("Text extraction completed.")
 
-# Split text into smaller chunks
+# ---------- Text Splitting ----------
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 chunks = text_splitter.create_documents([text])
 print(f"Split document into {len(chunks)} chunks.")
 
-# Initialize SentenceTransformer embeddings
+# ---------- Initialize Embeddings ----------
 embedding_function = SentenceTransformerEmbeddings()
 print("Generating embeddings...")
-
-# Prepare embeddings for document chunks
 embeddings = embedding_function.embed_documents([chunk.page_content for chunk in chunks])
 
-# Milvus connection parameters (Docker instance)
-MILVUS_HOST = "localhost"  # Change if running on a different server
-MILVUS_PORT = "19530"  # Default port for Milvus standalone
-COLLECTION_NAME = "Document_Creation_collection"    #IPC_collection
+# ---------- Connect to Milvus ----------
+MILVUS_HOST = "localhost"
+MILVUS_PORT = "19530"
+connections.connect(alias="default", host=MILVUS_HOST, port=MILVUS_PORT, secure=False)
+print("Connected to Milvus successfully!")
 
-# Store chunks into Milvus (Docker)
-vector_store_saved = Milvus.from_documents(
-    [Document(page_content=chunk.page_content) for chunk in chunks],
-    embedding_function,
-    collection_name=COLLECTION_NAME, 
+# ---------- Prepare Documents with Metadata ----------
+docs_with_metadata = [
+    Document(page_content=chunk.page_content, metadata={"source": f"page_{i}"})
+    for i, chunk in enumerate(chunks)
+]
+
+# ---------- Store in Milvus ----------
+COLLECTION_NAME = "IPC_collection"
+vector_store = Milvus.from_documents(
+    documents=docs_with_metadata,
+    embedding=embedding_function,
+    collection_name=COLLECTION_NAME,
     connection_args={"host": MILVUS_HOST, "port": MILVUS_PORT},
-    index_params={"index_type": "FLAT"}  # Ensure FLAT index type for accurate similarity search
+    index_params={"index_type": "FLAT"}  # FLAT index ensures accuracy
 )
-print("Embeddings stored in Milvus (Docker). Ready for queries!")
+
+print("Embeddings stored in Milvus. Ready for queries!")

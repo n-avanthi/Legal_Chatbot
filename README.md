@@ -59,26 +59,23 @@ The frontend is developed using React and Vite, while the backend is built using
     ```bash
     pip install -r requirements.txt
     ```
+4. If the previous one doesnt work and if you face anyy dependancy issues
+
+    ```bash
+    pip install -r requirements1.txt
+    ```
 
 ### Milvus Setup
-
-1. Follow the Milvus installation guide to set up the Milvus vector database on your system using docker.
-2. Run Milvus from your terminal using 
-    ```bash
-    bash standalone_embed.sh start
     ```
-3. Run the script to make collections on the vector database.
+ Run the create_collections.py file 2 times, once with "./IPC.pdf" as the path and once more with "./documentforms.pdf" as the path   
+
+1. Run the script to make collections on the vector database.
     ```bash
     create_collections.py
     ```
+2. Then run precedance_collections.py file with "./case_files" as the path 
 
-### Ollama LLM Integration
-
-1. Ensure that Ollama is properly installed and running on your machine. Refer to the Ollama documentation for installation instructions.
-2. Download the Llama 3.2 with 1B parameters model
-    ```bash
-    ollama run llama3.2:1b
-    ```
+#### By doing steps 1 and 2 you insert the vector embeddings into milvus which should already be running in docker 
 
 ### Backend Setup (Flask)
 

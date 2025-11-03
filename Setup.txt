@@ -1,0 +1,16 @@
+activate the .venv = source .venv/bin/activate
+python3 precedence_collections.py
+python3 create_collections.py
+
+cd milvus
+docker compose up -d
+bash standalone_embed.sh start
+
+ollama serve
+
+python3 app.py
+
+cd frontend 
+npm run dev
+
+python3 evaluate_legal.py --gold gold_legal.jsonl 
